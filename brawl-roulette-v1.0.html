@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>브롤 룰렛 v1.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+// Babel 콘솔 경고 억제
+(function(){
+  const _warn = console.warn.bind(console);
+  const _error = console.error.bind(console);
+  const suppress = (args) => args.length > 0 && typeof args[0] === 'string' && (
+    args[0].includes('Babel') || args[0].includes('text/babel') || 
+    args[0].includes('You are using the in-browser') || args[0].includes('transpiling')
+  );
+  console.warn = (...args) => { if(!suppress(args)) _warn(...args); };
+  console.error = (...args) => { if(!suppress(args)) _error(...args); };
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{background:#1a3a6b;color:#fff;font-family:'Black Han Sans','Arial Black',Arial,sans-serif;overflow-x:hidden;}
+  button{-webkit-appearance:none;appearance:none;font-family:'Black Han Sans','Arial Black',Arial,sans-serif;}
+
+  /* 브롤스타즈 공식 버튼 스타일 */
+  .brawl-btn {
+    background: linear-gradient(180deg, #FFE234 0%, #FFB800 60%, #FF8C00 100%);
+    color: #5a2d00;
+    border: 3px solid #3d1f00;
+    border-radius: 14px;
+    font-family: 'Black Han Sans','Arial Black',Arial,sans-serif;
+    font-weight: 900;
+    cursor: pointer;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+    box-shadow: 0 5px 0 #8B4500, 0 6px 12px rgba(0,0,0,0.5);
+    transition: all 0.1s;
+    position: relative;
+    top: 0;
+  }
+  .brawl-btn:active { top: 3px; box-shadow: 0 2px 0 #8B4500, 0 3px 6px rgba(0,0,0,0.4); }
+  .brawl-btn:disabled { background: linear-gradient(180deg,#aaa,#888); color:#555; box-shadow:0 5px 0 #444; border-color:#333; cursor:not-allowed; top:0; }
+
+  .brawl-btn-blue {
+    background: linear-gradient(180deg, #5BC8FF 0%, #2299EE 60%, #0066CC 100%);
+    color: #fff;
+    border: 3px solid #003d7a;
+    border-radius: 14px;
+    font-family: 'Black Han Sans','Arial Black',Arial,sans-serif;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #003060, 0 6px 12px rgba(0,0,0,0.5);
+    transition: all 0.1s;
+    position: relative;
+    top: 0;
+  }
+  .brawl-btn-blue:active { top: 3px; box-shadow: 0 2px 0 #003060; }
+
+  /* 카드 스타일 */
+  .brawl-card {
+    background: linear-gradient(180deg, #1e5fa8 0%, #143d73 100%);
+    border: 3px solid #0a2a52;
+    border-radius: 18px;
+    box-shadow: 0 4px 0 #091e3a, 0 6px 20px rgba(0,0,0,0.4);
+  }
+
+  /* 섹션 제목 */
+  .brawl-label {
+    background: linear-gradient(180deg,#FFE234,#FFB800);
+    color: #5a2d00;
+    border: 2px solid #3d1f00;
+    border-radius: 8px;
+    padding: 4px 14px;
+    font-size: 13px;
+    font-weight: 900;
+    display: inline-block;
+    box-shadow: 0 3px 0 #8B4500;
+    letter-spacing: 1px;
+  }
+
+  /* 토글 스위치 */
+  .brawl-toggle {
+    width: 58px; height: 32px; border-radius: 16px;
+    border: 3px solid #0a2a52;
+    cursor: pointer; position: relative;
+    transition: background 0.2s;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+    flex-shrink: 0;
+  }
+  .brawl-toggle-knob {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(180deg,#fff,#ddd);
+    position: absolute; top: 2px;
+    transition: left 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    border: 1px solid rgba(0,0,0,0.2);
+  }
+
+  /* 배경 별 애니메이션 */
+  @keyframes twinkle { 0%,100%{opacity:0.3;transform:scale(1)} 50%{opacity:1;transform:scale(1.3)} }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  @keyframes spinSlow { to{transform:rotate(360deg)} }
+  @keyframes slideIn { from{transform:scale(0.3) translateY(60px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
+  @keyframes popIn { 0%{transform:scale(0)} 70%{transform:scale(1.1)} 100%{transform:scale(1)} }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 20px #FFE234aa} 50%{box-shadow:0 0 40px #FFE234,0 0 80px #FFB800aa} }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useCallback, useEffect } = React;
+
+const GAME_MODES = [
+  { id:"showdown", name:"쇼다운", bg:"#E8A020", color:"#FFD000", border:"#8B5A00",
+    icon:<svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="22" r="14" fill="white" stroke="#222" strokeWidth="2.5"/><circle cx="19" cy="19" r="3" fill="#222"/><circle cx="29" cy="19" r="3" fill="#222"/><line x1="19" y1="19" x2="19" y2="14" stroke="#222" strokeWidth="3" strokeLinecap="round"/><line x1="29" y1="19" x2="29" y2="14" stroke="#222" strokeWidth="3" strokeLinecap="round"/><path d="M18 27 Q24 23 30 27" stroke="#222" strokeWidth="2.5" fill="none" strokeLinecap="round"/><circle cx="21" cy="31" r="2.5" fill="#33CC33"/><circle cx="27" cy="33" r="2.5" fill="#33CC33"/></svg> },
+  { id:"gemgrab", name:"젬 그랩", bg:"#7B2FBE", color:"#DD77FF", border:"#3d0080",
+    icon:<svg viewBox="0 0 48 48" fill="none"><polygon points="24,4 38,17 24,44 10,17" fill="#CC44FF" stroke="#fff" strokeWidth="2.5"/><polygon points="24,4 38,17 24,22 10,17" fill="#EE99FF"/><polygon points="24,22 38,17 24,44" fill="#7700AA"/><polygon points="24,22 10,17 24,44" fill="#9911CC"/><line x1="10" y1="17" x2="38" y2="17" stroke="rgba(255,255,255,0.5)" strokeWidth="2"/><circle cx="24" cy="13" r="3" fill="white" opacity="0.6"/></svg> },
+  { id:"knockout", name:"녹아웃", bg:"#CC5500", color:"#FF9933", border:"#7a2a00",
+    icon:<svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="17" stroke="white" strokeWidth="3" fill="none"/><circle cx="24" cy="24" r="9" stroke="white" strokeWidth="2.5" fill="none"/><circle cx="24" cy="24" r="4" fill="#FF2222"/><line x1="24" y1="7" x2="24" y2="15" stroke="white" strokeWidth="3" strokeLinecap="round"/><line x1="24" y1="33" x2="24" y2="41" stroke="white" strokeWidth="3" strokeLinecap="round"/><line x1="7" y1="24" x2="15" y2="24" stroke="white" strokeWidth="3" strokeLinecap="round"/><line x1="33" y1="24" x2="41" y2="24" stroke="white" strokeWidth="3" strokeLinecap="round"/></svg> },
+  { id:"brawlball", name:"브롤 볼", bg:"#1155BB", color:"#55AAFF", border:"#002266",
+    icon:<svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="17" fill="white" stroke="#111" strokeWidth="2.5"/><polygon points="24,8 28.5,19 24,23 19.5,19" fill="#111"/><polygon points="40,19 31.5,21 29.5,27 36,32" fill="#111"/><polygon points="36,39 29.5,31.5 24,33.5 26,42" fill="#111"/><polygon points="12,39 18.5,31.5 24,33.5 22,42" fill="#111"/><polygon points="8,19 16.5,21 18.5,27 12,32" fill="#111"/><circle cx="24" cy="24" r="4" fill="none" stroke="#111" strokeWidth="1.5"/></svg> },
+  { id:"hotzone", name:"핫 존", bg:"#CC1111", color:"#FF5555", border:"#7a0000",
+    icon:<svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="33" r="11" fill="#FF2222" stroke="white" strokeWidth="2.5"/><rect x="22" y="8" width="4" height="25" rx="2" fill="white"/><circle cx="24" cy="8" r="5" fill="white"/><circle cx="24" cy="33" r="4.5" fill="white" opacity="0.9"/><circle cx="24" cy="33" r="2" fill="#FF2222"/></svg> },
+  { id:"bounty", name:"바운티", bg:"#007799", color:"#33DDEE", border:"#004466",
+    icon:<svg viewBox="0 0 48 48" fill="none"><polygon points="24,2 29.5,16 44.5,16 33,25.5 37.5,40 24,31 10.5,40 15,25.5 3.5,16 18.5,16" fill="#FFD700" stroke="#CC8800" strokeWidth="2"/><circle cx="24" cy="22" r="5" fill="#CC8800" opacity="0.4"/></svg> },
+  { id:"brawlhockey", name:"브롤 하키", bg:"#445566", color:"#AABBCC", border:"#222f3e",
+    icon:<svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="20" r="13" fill="#FFD700" stroke="#BB8800" strokeWidth="2.5"/><rect x="14" y="8" width="5" height="5" rx="1.5" fill="#FF2222"/><rect x="29" y="8" width="5" height="5" rx="1.5" fill="#2244FF"/><circle cx="19" cy="18" r="3.5" fill="#222"/><circle cx="29" cy="18" r="3.5" fill="#222"/><path d="M16 26 Q24 31 32 26" stroke="#222" strokeWidth="3" fill="none" strokeLinecap="round"/><rect x="9" y="36" width="30" height="7" rx="3.5" fill="#333" stroke="white" strokeWidth="1.5"/><rect x="13" y="38" width="5" height="5" rx="1" fill="#666"/><rect x="21" y="38" width="5" height="5" rx="1" fill="#666"/><rect x="29" y="38" width="5" height="5" rx="1" fill="#666"/></svg> },
+  { id:"wipeout", name:"클린 아웃", bg:"#AA0055", color:"#FF55AA", border:"#660033",
+    icon:<svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="20" r="13" fill="#FF44AA" stroke="white" strokeWidth="2.5"/><circle cx="19" cy="17" r="3" fill="white"/><circle cx="29" cy="17" r="3" fill="white"/><circle cx="19" cy="17" r="1.4" fill="#222"/><circle cx="29" cy="17" r="1.4" fill="#222"/><path d="M18 24 Q24 29 30 24" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round"/><circle cx="12" cy="21" r="4" fill="#FF44AA" stroke="white" strokeWidth="2"/><circle cx="36" cy="21" r="4" fill="#FF44AA" stroke="white" strokeWidth="2"/><rect x="20" y="31" width="8" height="11" rx="4" fill="#FF44AA" stroke="white" strokeWidth="2"/></svg> },
+  { id:"heist", name:"하이스트", bg:"#991199", color:"#EE44FF", border:"#550066",
+    icon:<svg viewBox="0 0 48 48" fill="none"><rect x="8" y="20" width="32" height="22" rx="5" fill="#2288FF" stroke="white" strokeWidth="2.5"/><rect x="8" y="20" width="32" height="9" rx="5" fill="#44AAFF"/><rect x="8" y="25" width="32" height="4" fill="#44AAFF"/><rect x="17" y="31" width="14" height="9" rx="3" fill="#0055BB" stroke="white" strokeWidth="1.5"/><circle cx="24" cy="35" r="2.5" fill="#FFD700"/><path d="M17 14 C17 8 31 8 31 14 L31 20 L17 20 Z" fill="#2288FF" stroke="white" strokeWidth="2"/><circle cx="34" cy="24" r="5" fill="#BB33FF" stroke="white" strokeWidth="2"/><circle cx="34" cy="24" r="2.5" fill="#FFD700"/></svg> },
+];
+
+// ── 배경 장식 ─────────────────────────────────────────────────────────────
+function BgDecor() {
+  const stars = Array.from({length:12},(_,i)=>({
+    x: 5+i*8, y: 3+(i%5)*18,
+    size: 6+i%4*3,
+    delay: i*0.3,
+    dur: 2+i%3,
+  }));
+  return (
+    <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,overflow:"hidden"}}>
+      {/* 배경 그라디언트 */}
+      <div style={{position:"absolute",inset:0,background:"linear-gradient(160deg,#0e2a5e 0%,#1a3a7a 40%,#0e1f4a 100%)"}}/>
+      {/* 빛 번짐 */}
+      <div style={{position:"absolute",top:"-10%",left:"50%",transform:"translateX(-50%)",width:"80%",height:"40%",background:"radial-gradient(ellipse,rgba(255,220,50,0.12) 0%,transparent 70%)"}}/>
+      {/* 별들 */}
+      {stars.map((s,i)=>(
+        <div key={i} style={{position:"absolute",left:`${s.x}%`,top:`${s.y}%`,width:s.size,height:s.size,animation:`twinkle ${s.dur}s ease-in-out ${s.delay}s infinite`}}>
+          <svg viewBox="0 0 20 20"><polygon points="10,1 12.9,7 19.5,7.6 14.8,12 16.4,18.5 10,15 3.6,18.5 5.2,12 0.5,7.6 7.1,7" fill="rgba(255,220,50,0.5)"/></svg>
+        </div>
+      ))}
+      {/* 브롤 로고 워터마크 */}
+      <div style={{position:"absolute",bottom:16,right:16,opacity:0.06,fontSize:80,fontWeight:900,color:"#FFD700",lineHeight:1,userSelect:"none"}}>BS</div>
+    </div>
+  );
+}
+
+// ── 당첨 오버레이 ──────────────────────────────────────────────────────────
+function WinOverlay({ mode, onClose }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(()=>{ const t=setTimeout(()=>setVisible(true),40); return ()=>clearTimeout(t); },[]);
+  const particles = ["#FFD700","#FF6B6B","#48DBFB","#FF9FF3","#1DD1A1","#FF9F43","#A29BFE","#FD79A8","#55EFC4","#FDCB6E","#E84393","#0984E3","#6C5CE7","#00CEC9","#E17055","#74B9FF"];
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:300,background:"rgba(5,15,40,0.92)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)"}}>
+      {/* 파티클 */}
+      {particles.map((c,i)=>{
+        const angle=(i/particles.length)*360,r=42;
+        const tx=Math.cos(angle*Math.PI/180)*r,ty=Math.sin(angle*Math.PI/180)*r;
+        return <div key={i} style={{position:"absolute",top:"50%",left:"50%",width:14,height:14,borderRadius:"50%",background:c,boxShadow:`0 0 16px 5px ${c}`,opacity:visible?1:0,transform:visible?`translate(calc(-50% + ${tx}vw),calc(-50% + ${ty}vw))`:"translate(-50%,-50%) scale(0)",transition:`all 0.7s cubic-bezier(0.22,1,0.36,1) ${i*0.03}s`}}/>;
+      })}
+
+      <div style={{textAlign:"center",animation:visible?"slideIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards":"none",opacity:visible?1:0,padding:"0 20px"}}>
+        {/* 당첨 배너 */}
+        <div style={{background:"linear-gradient(180deg,#FFE234,#FFB800)",border:"3px solid #8B4500",borderRadius:16,padding:"6px 28px",display:"inline-block",marginBottom:20,boxShadow:"0 4px 0 #8B4500,0 6px 20px rgba(255,200,0,0.5)"}}>
+          <span style={{fontSize:22,fontWeight:900,color:"#5a2d00",letterSpacing:3,fontFamily:"'Black Han Sans','Arial Black',Arial"}}>🏆 당첨!</span>
+        </div>
+
+        {/* 모드 아이콘 */}
+        <div style={{width:200,height:200,borderRadius:40,background:`linear-gradient(135deg,${mode.bg}ff,${mode.bg}99)`,border:`5px solid white`,boxShadow:`0 0 0 4px ${mode.border},0 0 50px ${mode.color}99,0 20px 60px rgba(0,0,0,0.6)`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 24px",padding:28,animation:visible?"pulse 2s ease-in-out infinite":undefined}}>
+          {mode.icon}
+        </div>
+
+        {/* 모드 이름 */}
+        <div style={{background:"linear-gradient(180deg,#1e5fa8,#0e3060)",border:"3px solid white",borderRadius:16,padding:"10px 36px",display:"inline-block",boxShadow:"0 5px 0 #091e3a,0 8px 24px rgba(0,0,0,0.5)",marginBottom:24}}>
+          <span style={{fontSize:"clamp(28px,7vw,48px)",fontWeight:900,color:"#FFE234",fontFamily:"'Black Han Sans','Arial Black',Arial",textShadow:"0 2px 0 #8B4500",letterSpacing:1}}>{mode.name}</span>
+        </div>
+
+        <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",letterSpacing:3,fontFamily:"'Black Han Sans','Arial Black',Arial"}}>탭하여 닫기</div>
+      </div>
+    </div>
+  );
+}
+
+// ── 슬롯 룰렛 ─────────────────────────────────────────────────────────────
+function SlotRoulette({ modes, onResult, isPC }) {
+  const [spinning, setSpinning] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const animRef = useRef(null);
+  const offsetRef = useRef(0);
+  const ITEM_W = isPC ? 155 : 115;
+  const VISIBLE = isPC ? 5 : 3;
+  const extended = [...modes,...modes,...modes,...modes,...modes,...modes,...modes];
+
+  const spin = () => {
+    if (spinning || modes.length < 2) return;
+    setSpinning(true);
+    const startOffset = offsetRef.current;
+    const winIdx = modes.length*3 + Math.floor(Math.random()*modes.length);
+    const centeredOffset = -(winIdx*ITEM_W - (VISIBLE*ITEM_W)/2 + ITEM_W/2);
+    const totalDist = centeredOffset - startOffset;
+    const duration = 3000 + Math.random()*1400;
+    const startTime = performance.now();
+    function easeOut(t){return 1-Math.pow(1-t,4);}
+    function animate(now){
+      const elapsed=now-startTime, progress=Math.min(elapsed/duration,1);
+      const current=startOffset+totalDist*easeOut(progress);
+      offsetRef.current=current; setOffset(current);
+      if(progress<1){animRef.current=requestAnimationFrame(animate);}
+      else{setSpinning(false); onResult(modes[winIdx%modes.length]);}
+    }
+    animRef.current=requestAnimationFrame(animate);
+  };
+
+  const iconSz = isPC ? 100 : 72;
+  const itemH  = isPC ? 165 : 130;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:isPC?32:24}}>
+      {/* 슬롯 머신 */}
+      <div style={{position:"relative",width:ITEM_W*VISIBLE}}>
+        {/* 위 포인터 */}
+        <div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",zIndex:10}}>
+          <svg width="32" height="28" viewBox="0 0 32 28"><polygon points="16,28 0,0 32,0" fill="#FFE234" stroke="#8B4500" strokeWidth="2"/></svg>
+        </div>
+
+        {/* 슬롯 본체 */}
+        <div style={{width:"100%",overflow:"hidden",borderRadius:20,border:"4px solid #FFE234",background:"#06060F",position:"relative",boxShadow:"0 0 0 2px #8B4500,0 0 40px rgba(255,220,50,0.2),inset 0 0 40px rgba(0,0,0,0.8)"}}>
+          {/* 좌우 페이드 */}
+          <div style={{position:"absolute",inset:0,zIndex:2,pointerEvents:"none",background:"linear-gradient(to right,#06060F 0%,transparent 20%,transparent 80%,#06060F 100%)"}}/>
+          {/* 중앙 프레임 */}
+          <div style={{position:"absolute",left:"50%",top:0,bottom:0,transform:"translateX(-50%)",width:ITEM_W,border:"4px solid #FFE234",borderRadius:14,zIndex:3,pointerEvents:"none",boxShadow:spinning?"0 0 40px #FFE234,inset 0 0 20px rgba(255,220,50,0.1)":"0 0 16px rgba(255,220,50,0.4)",transition:"box-shadow 0.3s"}}/>
+
+          {/* 아이템 트랙 */}
+          <div style={{display:"flex",transform:`translateX(${offset}px)`,willChange:"transform",padding:"16px 0"}}>
+            {extended.map((mode,i)=>(
+              <div key={i} style={{minWidth:ITEM_W,height:itemH,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}>
+                <div style={{width:iconSz,height:iconSz,borderRadius:isPC?24:18,background:`linear-gradient(135deg,${mode.bg}bb,${mode.bg}66)`,border:`3px solid ${mode.color}88`,display:"flex",alignItems:"center",justifyContent:"center",padding:isPC?16:12,boxShadow:`0 4px 12px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.15)`}}>{mode.icon}</div>
+                <span style={{color:"#FFE234",fontSize:isPC?13:10,fontWeight:900,textAlign:"center",fontFamily:"'Black Han Sans','Arial Black',Arial",maxWidth:ITEM_W-12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textShadow:"0 1px 4px rgba(0,0,0,0.8)"}}>{mode.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 아래 포인터 */}
+        <div style={{position:"absolute",bottom:-14,left:"50%",transform:"translateX(-50%)",zIndex:10}}>
+          <svg width="32" height="28" viewBox="0 0 32 28"><polygon points="16,0 0,28 32,28" fill="#FFE234" stroke="#8B4500" strokeWidth="2"/></svg>
+        </div>
+      </div>
+
+      {/* 돌리기 버튼 */}
+      <button className="brawl-btn" onClick={spin} disabled={spinning||modes.length<2}
+        style={{padding:isPC?"18px 80px":"15px 60px",fontSize:isPC?22:19,letterSpacing:2,borderRadius:50,minWidth:isPC?260:200}}>
+        {spinning ? "⏳ 돌아가는 중…" : "🎰 돌리기!"}
+      </button>
+    </div>
+  );
+}
+
+// ── 히스토리 ───────────────────────────────────────────────────────────────
+function History({ items, isPC }) {
+  if (!items.length) return null;
+  return (
+    <div className="brawl-card" style={{padding:16}}>
+      <div style={{marginBottom:10}}><span className="brawl-label">📋 최근 결과</span></div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {items.map((h,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:10,background:i===0?"rgba(255,220,50,0.12)":"rgba(255,255,255,0.04)",border:i===0?"2px solid #FFE23466":"2px solid transparent"}}>
+            <div style={{width:28,height:28,flexShrink:0}}>{h.mode.icon}</div>
+            <span style={{fontWeight:900,fontSize:isPC?14:13,flex:1,color:i===0?"#FFE234":"#aaa",fontFamily:"'Black Han Sans','Arial Black',Arial"}}>{i===0&&"🏆 "}{h.mode.name}</span>
+            <span style={{fontSize:10,color:"#556"}}>{h.time}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── 메인 앱 ───────────────────────────────────────────────────────────────
+function App() {
+  const [isPC, setIsPC] = useState(false);
+  const [eliminateMode, setEliminateMode] = useState(false);
+  const [enabledSet, setEnabledSet] = useState(new Set(GAME_MODES.map(m=>m.id)));
+  const [eliminated, setEliminated] = useState(new Set());
+  const [history, setHistory] = useState([]);
+  const [winOverlay, setWinOverlay] = useState(null);
+
+  const activeModes = GAME_MODES.filter(m=>enabledSet.has(m.id)&&!eliminated.has(m.id));
+
+  const handleResult = useCallback((mode)=>{
+    setHistory(h=>[{mode,time:new Date().toLocaleTimeString("ko-KR")},...h].slice(0,8));
+    setTimeout(()=>setWinOverlay(mode),350);
+    if(eliminateMode) setEliminated(s=>new Set([...s,mode.id]));
+  },[eliminateMode]);
+
+  const toggleMode=(id)=>setEnabledSet(s=>{const n=new Set(s);if(n.has(id)){if(n.size>1)n.delete(id);}else n.add(id);return n;});
+  const toggleAll=()=>setEnabledSet(enabledSet.size===GAME_MODES.length?new Set([GAME_MODES[0].id]):new Set(GAME_MODES.map(m=>m.id)));
+  const resetEliminated=()=>setEliminated(new Set());
+
+  const rouletteSection=(
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      {activeModes.length<2?(
+        <div style={{textAlign:"center",padding:"44px 0"}}>
+          <div style={{fontSize:64,marginBottom:16,animation:"float 2s ease-in-out infinite"}}>😵</div>
+          <div className="brawl-card" style={{padding:"20px 32px",display:"inline-block"}}>
+            <p style={{color:"#FFE234",fontWeight:900,fontSize:16,fontFamily:"'Black Han Sans','Arial Black',Arial"}}>
+              {eliminateMode&&eliminated.size>0?"모든 모드 소진!":"최소 2개 이상 활성화하세요."}
+            </p>
+          </div>
+          {eliminateMode&&eliminated.size>0&&(
+            <div style={{marginTop:16}}><button className="brawl-btn" onClick={resetEliminated} style={{padding:"12px 32px",fontSize:16}}>🔄 다시 시작</button></div>
+          )}
+        </div>
+      ):(
+        <SlotRoulette key={activeModes.map(m=>m.id).join(",")} modes={activeModes} onResult={handleResult} isPC={isPC}/>
+      )}
+      <History items={history} isPC={isPC}/>
+    </div>
+  );
+
+  const settingsSection=(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {/* 당첨 모드 */}
+      <div className="brawl-card" style={{padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{marginBottom:6}}><span className="brawl-label">당첨 모드</span></div>
+          <div style={{fontSize:11,color:"#88aacc",marginTop:4}}>{eliminateMode?"🗑️ 제거 모드 — 당첨 모드 제거":"♻️ 유지 모드 — 반복 추첨 가능"}</div>
+          {eliminateMode&&eliminated.size>0&&(<div style={{fontSize:11,color:"#FF6B6B",marginTop:4}}>{eliminated.size}개 제거됨 · <span onClick={resetEliminated} style={{color:"#FFE234",textDecoration:"underline",cursor:"pointer"}}>리셋</span></div>)}
+        </div>
+        <div className="brawl-toggle" onClick={()=>{setEliminateMode(e=>!e);resetEliminated();}}
+          style={{background:eliminateMode?"linear-gradient(180deg,#FF5252,#CC1111)":"linear-gradient(180deg,#334,#223)"}}>
+          <div className="brawl-toggle-knob" style={{left:eliminateMode?30:4}}/>
+        </div>
+      </div>
+
+      {/* 게임모드 목록 */}
+      <div className="brawl-card" style={{padding:16}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <span className="brawl-label">게임 모드 ({enabledSet.size}/{GAME_MODES.length})</span>
+          <button className="brawl-btn-blue" onClick={toggleAll} style={{padding:"5px 14px",fontSize:11}}>
+            {enabledSet.size===GAME_MODES.length?"전체 해제":"전체 선택"}
+          </button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:isPC?"repeat(auto-fill,minmax(160px,1fr))":"repeat(auto-fill,minmax(145px,1fr))",gap:8}}>
+          {GAME_MODES.map(mode=>{
+            const on=enabledSet.has(mode.id),out=eliminated.has(mode.id);
+            return (
+              <div key={mode.id} onClick={()=>!out&&toggleMode(mode.id)}
+                style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:12,
+                  border:`2.5px solid ${on&&!out?mode.color+"bb":"rgba(255,255,255,0.08)"}`,
+                  background:on&&!out?`linear-gradient(135deg,${mode.bg}55,${mode.bg}22)`:out?"rgba(255,0,0,0.06)":"rgba(255,255,255,0.03)",
+                  cursor:out?"default":"pointer",opacity:out?0.3:on?1:0.4,
+                  transition:"all 0.15s",userSelect:"none",WebkitTapHighlightColor:"transparent",
+                  boxShadow:on&&!out?`0 2px 8px ${mode.bg}44`:"none"}}>
+                <div style={{width:isPC?34:28,height:isPC?34:28,flexShrink:0}}>{mode.icon}</div>
+                <span style={{fontSize:isPC?12:11,fontWeight:900,flex:1,minWidth:0,
+                  color:on&&!out?"#FFE234":"#445",
+                  fontFamily:"'Black Han Sans','Arial Black',Arial",lineHeight:1.3}}>
+                  {out?<s>{mode.name}</s>:mode.name}
+                </span>
+                {out
+                  ?<span style={{fontSize:14,flexShrink:0}}>❌</span>
+                  :<div style={{width:14,height:14,borderRadius:"50%",flexShrink:0,
+                    background:on?mode.color:"transparent",
+                    border:`2.5px solid ${on?mode.color:"rgba(255,255,255,0.2)"}`,
+                    boxShadow:on?`0 0 8px ${mode.color}`:"none",transition:"all 0.15s"}}/>
+                }
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100vh",position:"relative",overflowX:"hidden",paddingBottom:48}}>
+      <BgDecor/>
+      {winOverlay&&<WinOverlay key={winOverlay.id+Date.now()} mode={winOverlay} onClose={()=>setWinOverlay(null)}/>}
+
+      {/* 헤더 */}
+      <div style={{position:"relative",zIndex:10,textAlign:"center",padding:"20px 16px 16px",borderBottom:"3px solid rgba(255,220,50,0.2)",background:"rgba(10,28,70,0.7)",backdropFilter:"blur(8px)"}}>
+        {/* 타이틀 */}
+        <div style={{display:"inline-block",background:"linear-gradient(180deg,#1e5fa8,#0e3060)",border:"3px solid #FFE234",borderRadius:18,padding:"8px 28px",boxShadow:"0 5px 0 #8B4500,0 8px 24px rgba(0,0,0,0.5)",marginBottom:4}}>
+          <h1 style={{margin:0,fontSize:"clamp(22px,5.5vw,36px)",fontWeight:900,fontFamily:"'Black Han Sans','Arial Black',Arial",color:"#FFE234",textShadow:"0 2px 0 #8B4500,0 4px 12px rgba(0,0,0,0.6)",letterSpacing:2,lineHeight:1.1}}>
+            🎮 브롤 룰렛
+          </h1>
+        </div>
+        <p style={{margin:"4px 0 0",fontSize:11,color:"#88aacc",letterSpacing:3,fontFamily:"'Black Han Sans','Arial Black',Arial"}}>오늘 뭐 할지 정해드림</p>
+        <p style={{margin:"2px 0 0",fontSize:9,color:"#334",letterSpacing:1}}>v1.0</p>
+        {/* PC 토글 */}
+        <button className="brawl-btn-blue" onClick={()=>setIsPC(p=>!p)}
+          style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",padding:"7px 12px",fontSize:12,borderRadius:10}}>
+          {isPC?"📱":"🖥️"}
+        </button>
+      </div>
+
+      {/* 콘텐츠 */}
+      <div style={{position:"relative",zIndex:5}}>
+        {isPC?(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 400px",gap:28,padding:"32px 40px",maxWidth:1300,margin:"0 auto",alignItems:"start"}}>
+            <div>{rouletteSection}</div>
+            <div>{settingsSection}</div>
+          </div>
+        ):(
+          <div style={{padding:"24px 14px 0",display:"flex",flexDirection:"column",gap:14}}>
+            {rouletteSection}
+            {settingsSection}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
